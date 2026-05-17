@@ -9,7 +9,7 @@ on:
       upload-tag:
         type: string
         default: "nightly"
-  workflow_dispatch: # 👈 允许你手动点击按钮运行
+  workflow_dispatch: # 允许手动点击运行
 
 env:
   SCITER_RUST_VERSION: "1.75"
@@ -32,33 +32,7 @@ env:
   UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
 
 jobs:
-  generate-bridge:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install flutter_rust_bridge_codegen
-        run: |
-          cargo install flutter_rust_bridge_codegen --version 1.80.1 --vector-convert-patch --locked
-      - name: Generate bridge
-        run: |
-          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input src/flutter_ffi.rs --dart-output flutter/lib/generated_bridge.dart --dart-decl-output flutter/lib/generated_bridge.freezed.dart --class-name Bridge
-      - name: Upload bridge artifact
-        uses: actions/upload-artifact@master
-        with:
-          name: bridge-artifact
-          path: |
-            flutter/lib/generated_bridge.dart
-            flutter/lib/generated_bridge.freezed.dart
-
   build-rustdesk-android:
-    needs: [generate-bridge]
     name: build rustdesk android apk ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
@@ -72,8 +46,6 @@ jobs:
               reltype: release,
               suffix: "",
             }
-          # 如果你想顺便打 32位 armv7 的包，可以把下面这行取消注释：
-          # - { arch: armv7, target: armv7-linux-androideabi, os: ubuntu-24.04, reltype: release, suffix: "" }
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
@@ -146,12 +118,6 @@ jobs:
           fi
         shell: bash
 
-      - name: Restore bridge files
-        uses: actions/download-artifact@master
-        with:
-          name: bridge-artifact
-          path: ./
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@v1
         with:
@@ -175,11 +141,6 @@ jobs:
               ./flutter/ndk_arm64.sh
               mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
               cp ./target/${{ matrix.job.target }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
-              ;;
-            armv7-linux-androideabi)
-              ./flutter/ndk_arm.sh
-              mkdir -p ./flutter/android/app/src/main/jniLibs/armeabi-v7a
-              cp ./target/${{ matrix.job.target }}/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/librustdesk.so
               ;;
           esac
 
